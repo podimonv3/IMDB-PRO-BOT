@@ -1,6 +1,6 @@
 # https://github.com/odysseusmax/animated-lamp/blob/master/bot/database/database.py
 import motor.motor_asyncio
-from info import DATABASE_NAME, USERS_URI, MELCOW_NEW_USERS, P_TTI_SHOW_OFF, SINGLE_BUTTON, SPELL_CHECK_REPLY, PROTECT_CONTENT
+from info import DATABASE_NAME, USERS_URI, MELCOW_NEW_USERS, P_TTI_SHOW_OFF, SINGLE_BUTTON, PROTECT_CONTENT
 
 class Database:
     
@@ -114,8 +114,7 @@ class Database:
         default = {
             'button': SINGLE_BUTTON,
             'botpm': P_TTI_SHOW_OFF,
-            'file_secure': PROTECT_CONTENT,
-            'spell_check': SPELL_CHECK_REPLY,
+            'file_secure': PROTECT_CONTENT,            
             'welcome': MELCOW_NEW_USERS,
         }
         chat = await self.grp.find_one({'id':int(id)})
