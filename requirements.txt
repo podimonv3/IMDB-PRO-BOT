@@ -6,8 +6,6 @@ marshmallow==3.19.0
 motor==3.1.1
 umongo==3.1.0
 requests
-bs4
-cinemagoer
 datetime
 psutil
 python-dotenv
