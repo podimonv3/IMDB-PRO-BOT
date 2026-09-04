@@ -10,5 +10,5 @@ datetime
 psutil
 python-dotenv
 pyrofork==2.3.43
-beautifulsoup4
+
 
