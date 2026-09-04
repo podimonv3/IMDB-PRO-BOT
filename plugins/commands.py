@@ -932,7 +932,7 @@ async def send_log_file(client: Client, message: Message):
 
 
 # ====================================================================
-# === വിക്കിപീഡിയ സിനിമകൾ ശേഖരിക്കാനുള്ള കസ്റ്റം കമാൻഡ് (PERFECTED) ===
+# === വിക്കിപീഡിയ സിനിമകൾ ശേഖരിക്കാനുള്ള കസ്റ്റം കമാൻഡ് (FIXED BUTTONS) ===
 # ====================================================================
 
 USER_MOVIE_DATA = {}
@@ -948,18 +948,15 @@ def extract_movies_from_wiki(url):
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = []
         
-        # പേജിലെ എല്ലാ വിക്കി ടേബിളുകളും പരിശോധിക്കുന്നു (Box Office, Months etc)
         tables = soup.find_all('table', class_='wikitable')
         for table in tables:
             rows = table.find_all('tr')
-            for row in rows[1:]:  # ടേബിൾ ഹെഡർ ഒഴിവാക്കുന്നു
+            for row in rows[1:]:
                 columns = row.find_all(['td', 'th'])
                 for col in columns:
-                    i_tags = col.find_all('i') # ആ കോളത്തിലെ എല്ലാ ഇറ്റാലിക്സ് ടാഗുകളും എടുക്കുന്നു
+                    i_tags = col.find_all('i')
                     for i_tag in i_tags:
                         movie_name = i_tag.text.strip()
-                        
-                        # അനാവശ്യ നമ്പറുകൾ, ചിഹ്നങ്ങൾ, ആവർത്തനങ്ങൾ എന്നിവ പൂർണ്ണമായി ഒഴിവാക്കുന്നു
                         if movie_name and not movie_name.isdigit() and len(movie_name) > 1:
                             if movie_name not in movies:
                                 movies.append(movie_name)
@@ -972,7 +969,7 @@ def extract_movies_from_wiki(url):
 @Client.on_message(filters.private & filters.command("fetch") & filters.incoming)
 async def fetch_wiki_movies_command(client, message):
     if not message.reply_to_message or not message.reply_to_message.text:
-        await message.reply_text("❌ **ഉപയോഗിക്കേണ്ട രീതി:** വിക്കിപീഡിയ ലിങ്ക് അയച്ച ശേഷം ആ മെസ്സേജിന് മറുപടിയായി (Reply) `/fetch` എന്ന് ടൈപ്പ് ചെയ്യുക.")
+        await message.reply_text("❌ **ഉപ ഉപയോഗിക്കേണ്ട രീതി:** വിക്കിപീഡിയ ലിങ്ക് അയച്ച ശേഷം ആ മെസ്സേജിന് മറുപടിയായി (Reply) `/fetch` എന്ന് ടൈപ്പ് ചെയ്യുക.")
         return
 
     url = message.reply_to_message.text.strip()
@@ -995,12 +992,13 @@ async def fetch_wiki_movies_command(client, message):
     }
     
     total = len(movie_list)
-    first_movie = movie_list[0] # കൃത്യമായി ആദ്യത്തെ ഒരു സിനിമ മാത്രം സെലക്ട് ചെയ്യുന്നു
+    first_movie = movie_list[0]
     
     reply_text = f"🎬 **സിനിമ 1/{total}**\n\nകോപ്പി ചെയ്യാൻ താഴെ കാണുന്ന പേരിൽ തൊടുക:\n\n`{first_movie}`"
     
+    # മറ്റൊന്നുമായും മിക്സ് ആകാതിരിക്കാൻ പുതിയൊരു ഐഡി (wkmv_next) നൽകി
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➡️ Next Movie", callback_data="wiki_next")]
+        [InlineKeyboardButton("➡️ Next Movie", callback_data="wkmv_next")]
     ])
     
     await status_msg.delete()
@@ -1008,10 +1006,10 @@ async def fetch_wiki_movies_command(client, message):
 
 
 # Next, Previous ബട്ടണുകൾ ക്ലിക്ക് ചെയ്യുമ്പോൾ പേജ് മാറുന്ന ഭാഗം
-@Client.on_callback_query(filters.private & filters.regex(r"wiki_(next|prev)"))
-async def navigate_wiki_movies(client, callback_query):
+@Client.on_callback_query(filters.private & filters.regex(r"wkmv_(next|prev)"))
+async def navigate_wiki_movies_fixed(client, callback_query):
     user_id = callback_query.from_user.id
-    action = callback_query.data.split("_")[1] # next അല്ലെങ്കിൽ prev വേർതിരിക്കുന്നു
+    action = callback_query.data.split("_")[1] # 'next' അല്ലെങ്കിൽ 'prev' കൃത്യമായി എടുക്കുന്നു
     
     if user_id not in USER_MOVIE_DATA:
         await callback_query.answer("⚠️ സെഷൻ കാലാവധി കഴിഞ്ഞു! ലിങ്ക് വീണ്ടും അയച്ച് /fetch അടിക്കുക.", show_alert=True)
@@ -1038,9 +1036,9 @@ async def navigate_wiki_movies(client, callback_query):
     
     buttons = []
     if next_index > 0:
-        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="wiki_prev"))
+        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="wkmv_prev"))
     if next_index < total - 1:
-        buttons.append(InlineKeyboardButton("Next ➡️", callback_data="wiki_next"))
+        buttons.append(InlineKeyboardButton("Next ➡️", callback_data="wkmv_next"))
         
     keyboard = InlineKeyboardMarkup([buttons]) if buttons else None
     await callback_query.message.edit_text(reply_text, reply_markup=keyboard)
