@@ -932,7 +932,7 @@ async def send_log_file(client: Client, message: Message):
 
 
 # ====================================================================
-# === വിക്കിപീഡിയ സിനിമകൾ ശേഖരിക്കാനുള്ള കസ്റ്റം കമാൻഡ് (FIXED BUTTONS) ===
+# === വിക്കിപീഡിയ സിനിമകൾ ശേഖരിക്കാനുള്ള കസ്റ്റം കമാൻഡ് (100% FIXED) ===
 # ====================================================================
 
 USER_MOVIE_DATA = {}
@@ -940,14 +940,18 @@ USER_MOVIE_DATA = {}
 def extract_movies_from_wiki(url):
     """വിക്കിപീഡിയ പേജിലെ എല്ലാ കോണുകളിൽ നിന്നും സിനിമകൾ ആവർത്തനമില്ലാതെ എടുക്കുന്നു"""
     try:
-        header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        response = requests.get(url, headers=header, timeout=10)
+        # വിക്കിപീഡിയ ബ്ലോക്ക് ചെയ്യാതിരിക്കാനുള്ള ബ്രൗസർ ഹെഡർ
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=15)
         if response.status_code != 200:
             return None
             
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = []
         
+        # പേജിലെ എല്ലാ വിക്കി ടേബിളുകളും പരിശോധിക്കുന്നു
         tables = soup.find_all('table', class_='wikitable')
         for table in tables:
             rows = table.find_all('tr')
@@ -957,19 +961,22 @@ def extract_movies_from_wiki(url):
                     i_tags = col.find_all('i')
                     for i_tag in i_tags:
                         movie_name = i_tag.text.strip()
+                        
+                        # ചിഹ്നങ്ങളും അനാവശ്യ നമ്പറുകളും ഒഴിവാക്കാനുള്ള ഫിൽട്ടർ
                         if movie_name and not movie_name.isdigit() and len(movie_name) > 1:
                             if movie_name not in movies:
                                 movies.append(movie_name)
                                 
         return movies if movies else None
     except Exception as e:
+        print(f"Scraping Error: {e}") # logger എറർ ഒഴിവാക്കാൻ പ്രിന്റ് ഉപയോഗിച്ചു
         return None
 
 # ലിങ്ക് അയച്ച ശേഷം /fetch എന്ന് റിപ്ലൈ കൊടുക്കുമ്പോൾ പ്രവർത്തിക്കുന്ന ഭാഗം
 @Client.on_message(filters.private & filters.command("fetch") & filters.incoming)
 async def fetch_wiki_movies_command(client, message):
     if not message.reply_to_message or not message.reply_to_message.text:
-        await message.reply_text("❌ **ഉപ ഉപയോഗിക്കേണ്ട രീതി:** വിക്കിപീഡിയ ലിങ്ക് അയച്ച ശേഷം ആ മെസ്സേജിന് മറുപടിയായി (Reply) `/fetch` എന്ന് ടൈപ്പ് ചെയ്യുക.")
+        await message.reply_text("❌ **ഉപയോഗിക്കേണ്ട രീതി:** വിക്കിപീഡിയ ലിങ്ക് അയച്ച ശേഷം ആ മെസ്സേജിന് മറുപടിയായി (Reply) `/fetch` എന്ന് ടൈപ്പ് ചെയ്യുക.")
         return
 
     url = message.reply_to_message.text.strip()
@@ -982,7 +989,7 @@ async def fetch_wiki_movies_command(client, message):
     movie_list = extract_movies_from_wiki(url)
     
     if not movie_list:
-        await status_msg.edit_text("❌ ക്ഷമിക്കണം, ഈ ലിങ്കിൽ നിന്നും സിനിമകളുടെ പട്ടിക ശേഖരിക്കാൻ കഴിഞ്ഞില്ല.")
+        await status_msg.edit_text("❌ ക്ഷമിക്കണം, ഈ ലിങ്കിൽ നിന്നും സിനിമകളുടെ പട്ടിക ശേഖരിക്കാൻ കഴിഞ്ഞില്ല. വിക്കിപീഡിയ പേജ് നിലവിൽ ലഭ്യമാണോ എന്ന് ഉറപ്പുവരുത്തുക.")
         return
         
     user_id = message.from_user.id
@@ -992,11 +999,10 @@ async def fetch_wiki_movies_command(client, message):
     }
     
     total = len(movie_list)
-    first_movie = movie_list[0]
+    first_movie = movie_list[0] # ആദ്യത്തെ ഒരു സിനിമ കൃത്യമായി എടുക്കുന്നു
     
     reply_text = f"🎬 **സിനിമ 1/{total}**\n\nകോപ്പി ചെയ്യാൻ താഴെ കാണുന്ന പേരിൽ തൊടുക:\n\n`{first_movie}`"
     
-    # മറ്റൊന്നുമായും മിക്സ് ആകാതിരിക്കാൻ പുതിയൊരു ഐഡി (wkmv_next) നൽകി
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➡️ Next Movie", callback_data="wkmv_next")]
     ])
@@ -1009,7 +1015,7 @@ async def fetch_wiki_movies_command(client, message):
 @Client.on_callback_query(filters.private & filters.regex(r"wkmv_(next|prev)"))
 async def navigate_wiki_movies_fixed(client, callback_query):
     user_id = callback_query.from_user.id
-    action = callback_query.data.split("_")[1] # 'next' അല്ലെങ്കിൽ 'prev' കൃത്യമായി എടുക്കുന്നു
+    action = callback_query.data.split("_")[1] # 'next' അല്ലെങ്കിൽ 'prev' കൃത്യമായി വേർതിരിക്കുന്നു
     
     if user_id not in USER_MOVIE_DATA:
         await callback_query.answer("⚠️ സെഷൻ കാലാവധി കഴിഞ്ഞു! ലിങ്ക് വീണ്ടും അയച്ച് /fetch അടിക്കുക.", show_alert=True)
