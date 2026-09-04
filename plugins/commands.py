@@ -932,13 +932,13 @@ async def send_log_file(client: Client, message: Message):
 
 
 # ====================================================================
-# === වിക്കിപീഡിയ സിനിമകൾ ശേഖരിക്കാനുള്ള പ്രത്യേക കമാൻഡ് ===
+# === വിക്കിപീഡിയ സിനിമകൾ ശേഖരിക്കാനുള്ള കസ്റ്റം കമാൻഡ് (PERFECTED) ===
 # ====================================================================
 
 USER_MOVIE_DATA = {}
 
 def extract_movies_from_wiki(url):
-    """വിക്കിപീഡിയ ലിങ്കിൽ നിന്നും സിനിമകളുടെ ലിസ്റ്റ് ശേഖരിക്കുന്ന ഫങ്ക്ഷൻ"""
+    """വിക്കിപീഡിയ പേജിലെ എല്ലാ കോണുകളിൽ നിന്നും സിനിമകൾ ആവർത്തനമില്ലാതെ എടുക്കുന്നു"""
     try:
         header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         response = requests.get(url, headers=header, timeout=10)
@@ -948,39 +948,40 @@ def extract_movies_from_wiki(url):
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = []
         
-        # വിക്കിപീഡിയയിലെ വികിടേബിളുകൾ കണ്ടെത്തുന്നു
+        # പേജിലെ എല്ലാ വിക്കി ടേബിളുകളും പരിശോധിക്കുന്നു (Box Office, Months etc)
         tables = soup.find_all('table', class_='wikitable')
         for table in tables:
             rows = table.find_all('tr')
-            for row in rows[1:]:
+            for row in rows[1:]:  # ടേബിൾ ഹെഡർ ഒഴിവാക്കുന്നു
                 columns = row.find_all(['td', 'th'])
                 for col in columns:
-                    i_tag = col.find('i')
-                    if i_tag and i_tag.text.strip():
+                    i_tags = col.find_all('i') # ആ കോളത്തിലെ എല്ലാ ഇറ്റാലിക്സ് ടാഗുകളും എടുക്കുന്നു
+                    for i_tag in i_tags:
                         movie_name = i_tag.text.strip()
-                        # ഡ്യൂപ്ലിക്കേറ്റുകളും അനാവശ്യ നമ്പറുകളും ഒഴിവാക്കുന്നു
-                        if movie_name not in movies and not movie_name.isdigit():
-                            movies.append(movie_name)
-        return movies
+                        
+                        # അനാവശ്യ നമ്പറുകൾ, ചിഹ്നങ്ങൾ, ആവർത്തനങ്ങൾ എന്നിവ പൂർണ്ണമായി ഒഴിവാക്കുന്നു
+                        if movie_name and not movie_name.isdigit() and len(movie_name) > 1:
+                            if movie_name not in movies:
+                                movies.append(movie_name)
+                                
+        return movies if movies else None
     except Exception as e:
         return None
 
 # ലിങ്ക് അയച്ച ശേഷം /fetch എന്ന് റിപ്ലൈ കൊടുക്കുമ്പോൾ പ്രവർത്തിക്കുന്ന ഭാഗം
 @Client.on_message(filters.private & filters.command("fetch") & filters.incoming)
 async def fetch_wiki_movies_command(client, message):
-    # കമാൻഡ് ഒരു മെസ്സേജിന് റിപ്ലൈ ആണോ എന്ന് നോക്കുന്നു
     if not message.reply_to_message or not message.reply_to_message.text:
         await message.reply_text("❌ **ഉപയോഗിക്കേണ്ട രീതി:** വിക്കിപീഡിയ ലിങ്ക് അയച്ച ശേഷം ആ മെസ്സേജിന് മറുപടിയായി (Reply) `/fetch` എന്ന് ടൈപ്പ് ചെയ്യുക.")
         return
 
     url = message.reply_to_message.text.strip()
     
-    # ലിങ്ക് വിക്കിപീഡിയുടേത് തന്നെയാണോ എന്ന് ഉറപ്പുവരുത്തുന്നു
     if "en.wikipedia.org/wiki/" not in url:
         await message.reply_text("❌ ക്ഷമിക്കണം, ഇതൊരു ശരിയായ വിക്കിപീഡിയ ലിങ്ക് അല്ല.")
         return
 
-    status_msg = await message.reply_text("⏳ വിക്കിപീഡിയ പേജ് പരിശോധിക്കുന്നു, ദയവായി കാത്തിരിക്കൂ...")
+    status_msg = await message.reply_text("⏳ വിക്കിപീഡിയ പേജ് പൂർണ്ണമായി പരിശോധിക്കുന്നു, ദയവായി കാത്തിരിക്കൂ...")
     movie_list = extract_movies_from_wiki(url)
     
     if not movie_list:
@@ -994,7 +995,7 @@ async def fetch_wiki_movies_command(client, message):
     }
     
     total = len(movie_list)
-    first_movie = movie_list
+    first_movie = movie_list[0] # കൃത്യമായി ആദ്യത്തെ ഒരു സിനിമ മാത്രം സെലക്ട് ചെയ്യുന്നു
     
     reply_text = f"🎬 **സിനിമ 1/{total}**\n\nകോപ്പി ചെയ്യാൻ താഴെ കാണുന്ന പേരിൽ തൊടുക:\n\n`{first_movie}`"
     
@@ -1006,14 +1007,14 @@ async def fetch_wiki_movies_command(client, message):
     await message.reply_text(reply_text, reply_markup=keyboard)
 
 
-# Next, Previous ബട്ടണുകൾ ക്ലിക്ക് ചെയ്യുമ്പോൾ പ്രവർത്തിക്കുന്ന ഭാഗം
+# Next, Previous ബട്ടണുകൾ ക്ലിക്ക് ചെയ്യുമ്പോൾ പേജ് മാറുന്ന ഭാഗം
 @Client.on_callback_query(filters.private & filters.regex(r"wiki_(next|prev)"))
 async def navigate_wiki_movies(client, callback_query):
     user_id = callback_query.from_user.id
-    action = callback_query.data.split("_")
+    action = callback_query.data.split("_")[1] # next അല്ലെങ്കിൽ prev വേർതിരിക്കുന്നു
     
     if user_id not in USER_MOVIE_DATA:
-        await callback_query.answer("⚠️ സെഷൻ കാലാവധി കഴിഞ്ഞു! ദയവായി ലിങ്ക് വീണ്ടും അയച്ച് കമാൻഡ് നൽകുക.", show_alert=True)
+        await callback_query.answer("⚠️ സെഷൻ കാലാവധി കഴിഞ്ഞു! ലിങ്ക് വീണ്ടും അയച്ച് /fetch അടിക്കുക.", show_alert=True)
         return
         
     data = USER_MOVIE_DATA[user_id]
@@ -1027,7 +1028,7 @@ async def navigate_wiki_movies(client, callback_query):
         next_index = current_index - 1
         
     if next_index < 0 or next_index >= total:
-        await callback_query.answer("ലിസ്റ്റിന്റെ അറ്റത്ത് എത്തിക്കഴിഞ്ഞു!", show_alert=True)
+        await callback_query.answer("🎬 ലിസ്റ്റിന്റെ അറ്റത്ത് എത്തിക്കഴിഞ്ഞു!", show_alert=True)
         return
         
     USER_MOVIE_DATA[user_id]["current_index"] = next_index
@@ -1037,7 +1038,7 @@ async def navigate_wiki_movies(client, callback_query):
     
     buttons = []
     if next_index > 0:
-        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="move_prev")) # ഇവിടെ move_prev എന്ന് തന്നെ വേണം കാരണം നിലവിലുള്ള ബട്ടൺ ടാഗ് അങ്ങനെയാണ്
+        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="wiki_prev"))
     if next_index < total - 1:
         buttons.append(InlineKeyboardButton("Next ➡️", callback_data="wiki_next"))
         
